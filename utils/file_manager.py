@@ -1,8 +1,10 @@
 import os
+import re
 import tempfile
 import shutil
 import json
 import hashlib
+import logging
 from datetime import datetime
 
 class FileManager:
@@ -14,26 +16,44 @@ class FileManager:
 
     def _ensure_base_directory(self):
         """Ensure base directory exists"""
-        os.makedirs(self.base_dir, exist_ok=True)
+        try:
+            os.makedirs(self.base_dir, exist_ok=True)
+            logging.info(f"Base directory ensured at: {self.base_dir}")
+        except Exception as e:
+            logging.error(f"Failed to create base directory: {str(e)}")
+            raise RuntimeError(f"Failed to create base directory: {str(e)}")
 
     def create_scraping_session(self):
         """Create a new scraping session directory"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        session_dir = os.path.join(self.base_dir, f"web_scraper_data_{timestamp}")
-        os.makedirs(session_dir, exist_ok=True)
-        return session_dir
+        try:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            session_dir = os.path.join(self.base_dir, f"web_scraper_data_{timestamp}")
+            os.makedirs(session_dir, exist_ok=True)
+            logging.info(f"Created scraping session directory: {session_dir}")
+            return session_dir
+        except Exception as e:
+            logging.error(f"Failed to create scraping session directory: {str(e)}")
+            raise RuntimeError(f"Failed to create scraping session directory: {str(e)}")
 
     def create_website_directory(self, session_dir, url):
         """Create directory structure for a website"""
-        # Create a safe directory name from the URL
-        website_name = re.sub(r'[^\w\-_]', '_', url.split('//')[-1].split('/')[0])
-        website_dir = os.path.join(session_dir, website_name)
-        
-        # Create subdirectories
-        os.makedirs(os.path.join(website_dir, 'text'), exist_ok=True)
-        os.makedirs(os.path.join(website_dir, 'images'), exist_ok=True)
-        
-        return website_dir
+        try:
+            if not url or not session_dir:
+                raise ValueError("Invalid URL or session directory")
+                
+            # Create a safe directory name from the URL
+            website_name = re.sub(r'[^\w\-_]', '_', url.split('//')[-1].split('/')[0])
+            website_dir = os.path.join(session_dir, website_name)
+            
+            # Create subdirectories
+            os.makedirs(os.path.join(website_dir, 'text'), exist_ok=True)
+            os.makedirs(os.path.join(website_dir, 'images'), exist_ok=True)
+            
+            logging.info(f"Created website directory structure for: {url}")
+            return website_dir
+        except Exception as e:
+            logging.error(f"Failed to create website directory for {url}: {str(e)}")
+            raise RuntimeError(f"Failed to create website directory: {str(e)}")
 
     def store_content(self, website_dir, content, content_type='text'):
         """Store content in appropriate directory"""

@@ -129,8 +129,24 @@ document.addEventListener('DOMContentLoaded', function() {
             scrapeSelectedBtn.classList.add('d-none');
 
         } catch (error) {
-            addMessage('Error processing your request. Please try again.');
             console.error('Error:', error);
+            
+            // Handle error response from backend
+            if (error.response) {
+                const errorData = await error.response.json();
+                const errorMessage = errorData.message || errorData.error || 'Unknown error occurred';
+                addMessage(`Error: ${errorMessage}`);
+                
+                // Display individual website errors if available
+                if (errorData.errors && errorData.errors.length > 0) {
+                    const errorList = errorData.errors.map(err => 
+                        `- ${err.url}: ${err.error}`
+                    ).join('\n');
+                    addMessage(`Detailed errors:\n${errorList}`);
+                }
+            } else {
+                addMessage('Network error occurred. Please check your connection and try again.');
+            }
         } finally {
             loadingIndicator.classList.remove('active');
             scrapeSelectedBtn.disabled = false;
