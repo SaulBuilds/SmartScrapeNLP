@@ -6,6 +6,10 @@ import time
 import logging
 from urllib.robotparser import RobotFileParser
 import re
+import os
+import hashlib
+from PIL import Image
+from io import BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +51,78 @@ class WebCrawler:
         content = re.sub(r'^\s*$\n', '', content, flags=re.MULTILINE)
         return content.strip()
 
+    def extract_text_content(self, html_content):
+        """Extract clean text content from HTML using BeautifulSoup"""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            
+            # Remove unwanted elements
+            for element in soup(['script', 'style', 'nav', 'footer', 'header']):
+                element.decompose()
+            
+            # Get all text elements
+            paragraphs = []
+            for element in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+                text = element.get_text(strip=True)
+                if text:  # Only add non-empty paragraphs
+                    if element.name.startswith('h'):
+                        paragraphs.append(f"\n# {text}\n")
+                    else:
+                        paragraphs.append(text)
+            
+            return '\n\n'.join(paragraphs)
+        except Exception as e:
+            logger.error(f"Error extracting text content: {str(e)}", exc_info=True)
+            return None
+
+    def extract_images(self, html_content, base_url):
+        """Extract and download images from HTML content"""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            images = []
+            
+            for img in soup.find_all('img'):
+                src = img.get('src')
+                if not src:
+                    continue
+                
+                # Get absolute URL
+                img_url = urljoin(base_url, src)
+                
+                try:
+                    # Download image
+                    response = requests.get(img_url, headers=self.headers, timeout=10)
+                    response.raise_for_status()
+                    
+                    # Verify it's an image
+                    img_content = BytesIO(response.content)
+                    img_obj = Image.open(img_content)
+                    
+                    # Get image format and generate filename
+                    img_format = img_obj.format.lower() if img_obj.format else 'jpg'
+                    img_hash = hashlib.md5(response.content).hexdigest()[:10]
+                    filename = f"image_{img_hash}.{img_format}"
+                    
+                    # Add to images list
+                    images.append({
+                        'url': img_url,
+                        'content': response.content,
+                        'filename': filename,
+                        'format': img_format,
+                        'alt': img.get('alt', ''),
+                        'size': len(response.content)
+                    })
+                    
+                except Exception as e:
+                    logger.warning(f"Failed to process image {img_url}: {str(e)}")
+                    continue
+            
+            return images
+            
+        except Exception as e:
+            logger.error(f"Error extracting images: {str(e)}", exc_info=True)
+            return []
+
     def scrape_website(self, url):
         """Scrape content from a given URL with enhanced content cleaning and error handling"""
         try:
@@ -78,9 +154,17 @@ class WebCrawler:
                 )
                 
                 if main_content:
-                    cleaned_content = self._clean_content(main_content)
+                    html_content = self._clean_content(main_content)
+                    text_content = self.extract_text_content(html_content)
+                    images = self.extract_images(html_content, url)
+                    
                     logger.info(f"Successfully extracted content from {url}")
-                    return cleaned_content
+                    return {
+                        'html': html_content,
+                        'text': text_content,
+                        'images': images,
+                        'url': url
+                    }
 
             # Fallback to BeautifulSoup if trafilatura fails
             logger.info(f"Trafilatura extraction failed, falling back to BeautifulSoup for {url}")
@@ -99,15 +183,23 @@ class WebCrawler:
             if not main_content:
                 main_content = soup.body if soup.body else soup
             
-            content = str(main_content)
-            cleaned_content = self._clean_content(content)
+            html_content = str(main_content)
+            html_content = self._clean_content(html_content)
             
-            if not cleaned_content.strip():
+            if not html_content.strip():
                 logger.warning(f"No content extracted from {url}")
                 return None
-                
+            
+            text_content = self.extract_text_content(html_content)
+            images = self.extract_images(html_content, url)
+            
             logger.info(f"Successfully extracted content using fallback method from {url}")
-            return cleaned_content
+            return {
+                'html': html_content,
+                'text': text_content,
+                'images': images,
+                'url': url
+            }
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Request failed for {url}: {str(e)}")

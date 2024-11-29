@@ -40,10 +40,19 @@ class FileManager:
                     counter += 1
                 session_dir = f"{session_dir}_{counter}"
             
+            # Create main session directory
             os.makedirs(session_dir, mode=0o755)
             logger.info(f"Created session directory: {session_dir}")
             
-            # Ensure proper permissions
+            # Create subdirectories for different content types
+            subdirs = ['html', 'text', 'images']
+            for subdir in subdirs:
+                subdir_path = os.path.join(session_dir, subdir)
+                os.makedirs(subdir_path, mode=0o755)
+                os.chmod(subdir_path, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
+                logger.info(f"Created {subdir} directory: {subdir_path}")
+            
+            # Ensure proper permissions for main directory
             os.chmod(session_dir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
             
             return session_dir
@@ -51,28 +60,43 @@ class FileManager:
             logger.error(f"Failed to create session directory: {str(e)}", exc_info=True)
             raise Exception(f"Failed to create session directory: {str(e)}")
 
-    def save_content(self, session_dir, filename, content):
+    def save_content(self, session_dir, filename, content, content_type='html'):
         """Save content to a file in the session directory with proper error handling"""
         try:
             if not os.path.exists(session_dir):
                 raise Exception(f"Session directory does not exist: {session_dir}")
-                
-            filepath = os.path.join(session_dir, filename)
+            
+            # Determine the appropriate subdirectory based on content type
+            subdir = os.path.join(session_dir, content_type)
+            if not os.path.exists(subdir):
+                os.makedirs(subdir, mode=0o755)
+                os.chmod(subdir, stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
             
             # Ensure filename is safe
             safe_filename = os.path.basename(filename)
             if safe_filename != filename:
                 logger.warning(f"Sanitized filename from {filename} to {safe_filename}")
-                filepath = os.path.join(session_dir, safe_filename)
+                safe_filename = filename
             
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(content)
+            filepath = os.path.join(subdir, safe_filename)
+            
+            # Handle different content types
+            if content_type == 'images':
+                with open(filepath, 'wb') as f:
+                    f.write(content)
+            else:
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(content)
             
             # Set proper file permissions
             os.chmod(filepath, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
             
-            logger.info(f"Successfully saved content to: {filepath}")
+            logger.info(f"Successfully saved {content_type} content to: {filepath}")
             return filepath
+            
+        except Exception as e:
+            logger.error(f"Failed to save content: {str(e)}", exc_info=True)
+            raise Exception(f"Failed to save content: {str(e)}")
             
         except Exception as e:
             logger.error(f"Failed to save content: {str(e)}", exc_info=True)

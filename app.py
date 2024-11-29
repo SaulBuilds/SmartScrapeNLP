@@ -193,13 +193,53 @@ def scrape():
                     send_sse_message(client_id, f"Failed to scrape {url}", 'log', 'error')
                     continue
                 
-                # Save raw content
+                # Save content in different formats
                 try:
+                    # Save HTML content
                     file_manager.save_content(
                         session_dir,
-                        f"raw_{index}.html",
-                        content
+                        f"content_{index}.html",
+                        content['html'],
+                        'html'
                     )
+                    send_sse_message(
+                        client_id,
+                        f"Saved HTML content from {url}",
+                        'progress',
+                        {'progress': progress + 25, 'message': f"Saving HTML content from {url}"}
+                    )
+
+                    # Save text content
+                    if content['text']:
+                        file_manager.save_content(
+                            session_dir,
+                            f"content_{index}.txt",
+                            content['text'],
+                            'text'
+                        )
+                        send_sse_message(
+                            client_id,
+                            f"Saved text content from {url}",
+                            'progress',
+                            {'progress': progress + 50, 'message': f"Saving text content from {url}"}
+                        )
+
+                    # Save images
+                    for img_idx, img in enumerate(content['images']):
+                        file_manager.save_content(
+                            session_dir,
+                            img['filename'],
+                            img['content'],
+                            'images'
+                        )
+                    if content['images']:
+                        send_sse_message(
+                            client_id,
+                            f"Saved {len(content['images'])} images from {url}",
+                            'progress',
+                            {'progress': progress + 75, 'message': f"Saving images from {url}"}
+                        )
+
                 except Exception as e:
                     logger.error(f"Failed to save content for {url}: {str(e)}")
                     send_sse_message(client_id, f"Failed to save content from {url}", 'log', 'error')
