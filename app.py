@@ -33,29 +33,65 @@ def chat():
     
     # Get topic and relevant websites from LLM
     chat_response = llm_handler.process_user_input(user_message)
-    websites = chat_response.get('websites', [])
-    
-    # Scrape websites and store content
-    scraped_data = []
-    for website in websites:
-        content = web_crawler.scrape_website(website)
-        if content:
-            temp_path = file_manager.store_temp_content(content)
-            scraped_data.append({
-                'url': website,
-                'temp_path': temp_path,
-                'content': content
-            })
-    
-    # Analyze and filter content
-    analyzed_data = content_analyzer.analyze_content(scraped_data)
-    
-    # Clean up temporary files
-    file_manager.cleanup_temp_files()
     
     return jsonify({
         'response': chat_response['message'],
-        'analyzed_data': analyzed_data
+        'websites': chat_response.get('websites', [])
+    })
+
+@app.route('/api/scrape', methods=['POST'])
+def scrape():
+    websites = request.json.get('websites', [])
+    
+    if not websites:
+        return jsonify({'error': 'No websites provided'}), 400
+    
+    # Create new session directory
+    session_dir = file_manager.create_scraping_session()
+    
+    # Scrape and analyze websites
+    scraped_data = []
+    analyzed_data = []
+    
+    for website in websites:
+        if not web_crawler.is_valid_url(website):
+            continue
+            
+        content = web_crawler.scrape_website(website)
+        if not content:
+            continue
+            
+        # Create website directory
+        website_dir = file_manager.create_website_directory(session_dir, website)
+        
+        # Store main content
+        content_path = file_manager.store_content(website_dir, content, 'text')
+        
+        scraped_data.append({
+            'url': website,
+            'content': content,
+            'content_path': content_path
+        })
+        
+        # Extract and store images
+        images = content_analyzer._process_images(content)
+        for img in images:
+            try:
+                img_url = img['url']
+                img_content = web_crawler.download_image(img_url)
+                if img_content:
+                    img_path = file_manager.store_content(website_dir, img_content, 'image')
+                    img['stored_path'] = img_path
+            except Exception as e:
+                print(f"Error downloading image {img_url}: {str(e)}")
+    
+    # Analyze content
+    if scraped_data:
+        analyzed_data = content_analyzer.analyze_content(scraped_data)
+    
+    return jsonify({
+        'analyzed_data': analyzed_data,
+        'session_dir': session_dir
     })
 
 with app.app_context():

@@ -52,3 +52,13 @@ class WebCrawler:
             return all([result.scheme, result.netloc])
         except:
             return False
+            
+    def download_image(self, url):
+        """Download image from URL"""
+        try:
+            response = requests.get(url, headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                return response.content
+        except Exception as e:
+            print(f"Error downloading image: {str(e)}")
+        return None

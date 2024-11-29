@@ -9,10 +9,49 @@ class FileManager:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp()
         self.active_files = set()
+        self.base_dir = os.path.expanduser("~/Desktop")
+        self._ensure_base_directory()
+
+    def _ensure_base_directory(self):
+        """Ensure base directory exists"""
+        os.makedirs(self.base_dir, exist_ok=True)
+
+    def create_scraping_session(self):
+        """Create a new scraping session directory"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        session_dir = os.path.join(self.base_dir, f"web_scraper_data_{timestamp}")
+        os.makedirs(session_dir, exist_ok=True)
+        return session_dir
+
+    def create_website_directory(self, session_dir, url):
+        """Create directory structure for a website"""
+        # Create a safe directory name from the URL
+        website_name = re.sub(r'[^\w\-_]', '_', url.split('//')[-1].split('/')[0])
+        website_dir = os.path.join(session_dir, website_name)
+        
+        # Create subdirectories
+        os.makedirs(os.path.join(website_dir, 'text'), exist_ok=True)
+        os.makedirs(os.path.join(website_dir, 'images'), exist_ok=True)
+        
+        return website_dir
+
+    def store_content(self, website_dir, content, content_type='text'):
+        """Store content in appropriate directory"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        if content_type == 'text':
+            file_path = os.path.join(website_dir, 'text', f'content_{timestamp}.html')
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(content)
+        elif content_type == 'image':
+            file_path = os.path.join(website_dir, 'images', f'image_{timestamp}.jpg')
+            with open(file_path, 'wb') as f:
+                f.write(content)
+                
+        return file_path
 
     def store_temp_content(self, content):
         """Store content in temporary file and return path"""
-        # Create unique filename based on content hash
         content_hash = hashlib.md5(content.encode()).hexdigest()
         temp_path = os.path.join(self.temp_dir, f"{content_hash}.html")
         
