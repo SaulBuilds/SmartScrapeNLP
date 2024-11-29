@@ -13,12 +13,13 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     pass
 
 db = SQLAlchemy(model_class=Base)
+
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "intelligent_scraper_key"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///scraper.db"
@@ -28,120 +29,80 @@ db.init_app(app)
 
 # Initialize components
 llm_handler = LLMHandler()
-file_manager = FileManager()
 web_crawler = WebCrawler()
 content_analyzer = ContentAnalyzer()
+file_manager = FileManager()
 
 @app.route('/')
 def index():
+    """Render the main page"""
     return render_template('index.html')
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
-    user_message = request.json.get('message')
-    
-    # Get topic and relevant websites from LLM
-    chat_response = llm_handler.process_user_input(user_message)
-    
-    return jsonify({
-        'response': chat_response['message'],
-        'websites': chat_response.get('websites', [])
-    })
+    """Handle chat messages and return relevant websites"""
+    try:
+        message = request.json.get('message')
+        if not message:
+            return jsonify({'error': 'No message provided'}), 400
+            
+        # Process user input using LLM
+        result = llm_handler.process_user_input(message)
+        
+        return jsonify({
+            'response': result['message'],
+            'websites': result['websites']
+        })
+        
+    except Exception as e:
+        logging.error(f"Chat processing error: {str(e)}")
+        return jsonify({
+            'error': 'Failed to process chat message',
+            'message': str(e)
+        }), 500
 
 @app.route('/api/scrape', methods=['POST'])
 def scrape():
+    """Handle website scraping requests"""
     try:
         websites = request.json.get('websites', [])
-        
         if not websites:
-            return jsonify({
-                'error': 'No websites provided',
-                'message': 'Please select at least one website to scrape'
-            }), 400
+            return jsonify({'error': 'No websites provided'}), 400
+            
+        # Create session directory
+        session_dir = file_manager.create_session_directory()
         
-        logging.info(f"Starting scraping process for {len(websites)} websites")
-        
-        # Create new session directory
-        session_dir = file_manager.create_scraping_session()
-        
-        # Scrape and analyze websites
-        scraped_data = []
         analyzed_data = []
         errors = []
         
-        for website in websites:
+        for url in websites:
             try:
-                if not web_crawler.is_valid_url(website):
-                    errors.append({
-                        'url': website,
-                        'error': 'Invalid URL format'
-                    })
-                    continue
-                
-                logging.info(f"Scraping website: {website}")
-                content = web_crawler.scrape_website(website)
-                
+                # Scrape website
+                content = web_crawler.scrape_website(url)
                 if not content:
-                    errors.append({
-                        'url': website,
-                        'error': 'Failed to fetch content'
-                    })
+                    errors.append({'url': url, 'error': 'Failed to scrape content'})
                     continue
+                    
+                # Analyze content
+                result = content_analyzer.analyze_content([{'url': url, 'content': content}])
+                if result:
+                    analyzed_data.extend(result)
+                    
+            except Exception as e:
+                errors.append({'url': url, 'error': str(e)})
                 
-                # Create website directory
-                website_dir = file_manager.create_website_directory(session_dir, website)
-                
-                # Store main content
-                content_path = file_manager.store_content(website_dir, content, 'text')
-                logging.info(f"Stored content for {website}")
-                
-                scraped_data.append({
-                    'url': website,
-                    'content': content,
-                    'content_path': content_path
-                })
-                
-                # Extract and store images
-                images = content_analyzer._process_images(content)
-                for img in images:
-                    try:
-                        img_url = img['url']
-                        img_content = web_crawler.download_image(img_url)
-                        if img_content:
-                            img_path = file_manager.store_content(website_dir, img_content, 'image')
-                            img['stored_path'] = img_path
-                    except Exception as e:
-                        logging.error(f"Error downloading image {img_url}: {str(e)}")
-                        errors.append({
-                            'url': img_url,
-                            'error': f"Failed to download image: {str(e)}"
-                        })
+        if not analyzed_data and errors:
+            return jsonify({
+                'error': 'Content analysis failed',
+                'message': 'All websites failed to process',
+                'errors': errors
+            }), 500
             
-            except Exception as e:
-                logging.error(f"Error processing website {website}: {str(e)}")
-                errors.append({
-                    'url': website,
-                    'error': str(e)
-                })
-        
-        # Analyze content
-        if scraped_data:
-            try:
-                analyzed_data = content_analyzer.analyze_content(scraped_data)
-                logging.info("Content analysis completed successfully")
-            except Exception as e:
-                logging.error(f"Error analyzing content: {str(e)}")
-                return jsonify({
-                    'error': 'Content analysis failed',
-                    'message': str(e),
-                    'errors': errors
-                }), 500
-        
         return jsonify({
             'analyzed_data': analyzed_data,
             'session_dir': session_dir,
             'errors': errors,
-            'message': 'Scraping completed with {} successful sites'.format(len(analyzed_data))
+            'message': 'Scraping completed successfully'
         })
         
     except Exception as e:
@@ -150,6 +111,15 @@ def scrape():
             'error': 'Scraping process failed',
             'message': str(e)
         }), 500
+
+@app.route('/api/folder-structure')
+def get_folder_structure():
+    """Get the current folder structure"""
+    try:
+        structure = file_manager.get_folder_structure()
+        return jsonify(structure)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 with app.app_context():
     import models

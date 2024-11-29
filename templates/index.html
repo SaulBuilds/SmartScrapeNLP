@@ -5,59 +5,95 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Intelligent Web Scraper</title>
     <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/main.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="container py-4">
-        <h1 class="text-center mb-4">Intelligent Web Scraper</h1>
-        
-        <div class="row">
-            <div class="col-md-8 mx-auto">
-                <div class="chat-container">
-                    <div class="chat-messages">
-                        <!-- Messages will be added here dynamically -->
-                    </div>
-                    
-                    <form id="chat-form" class="chat-input">
-                        <input type="text" 
-                               id="user-input" 
-                               class="form-control" 
-                               placeholder="What topic would you like to research?"
-                               required>
-                        <button type="submit" class="btn btn-primary">Send</button>
-                    </form>
+    <div class="drawer-wrapper">
+        <!-- Left Drawer -->
+        <div id="left-drawer" class="drawer">
+            <div class="drawer-header">
+                <h5 class="mb-0">Project Explorer</h5>
+                <button type="button" class="btn-close drawer-close" aria-label="Close"></button>
+            </div>
+            <div class="drawer-content">
+                <div class="folder-tree">
+                    <!-- Folder structure will be displayed here -->
                 </div>
-
-                <div class="loading-indicator">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-2">Processing your request...</p>
-                </div>
-
-                <div id="website-selection" class="website-selection d-none mb-3">
-                    <h3>Suggested Websites</h3>
-                    <form id="website-form">
-                        <div class="website-list mb-3">
-                            <!-- Websites will be listed here -->
-                        </div>
-                        <button type="submit" class="btn btn-success d-none" id="scrape-selected">
-                            Scrape Selected Websites
-                        </button>
-                    </form>
-                </div>
-
-                <div class="results-container">
-                    <!-- Results will be displayed here -->
-                </div>
-
-                <div id="log-window" class="log-window d-none">
-                    <div class="log-header">
-                        <h5 class="mb-0">Progress Logs</h5>
-                        <button type="button" class="btn-close" aria-label="Close"></button>
-                    </div>
+                <div class="drawer-logs">
+                    <h6>Progress Logs</h6>
                     <div class="log-content">
                         <!-- Logs will be displayed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="container-fluid py-4">
+                <div class="drawer-toggle-btn">
+                    <button class="btn btn-sm btn-secondary" id="drawer-toggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
+                
+                <h1 class="text-center mb-4">Intelligent Web Scraper</h1>
+                
+                <div class="row">
+                    <div class="col-md-8 mx-auto">
+                        <div class="chat-container">
+                            <div class="chat-messages">
+                                <!-- Messages will be added here dynamically -->
+                            </div>
+                            
+                            <form id="chat-form" class="chat-input">
+                                <input type="text" 
+                                       id="user-input" 
+                                       class="form-control" 
+                                       placeholder="What topic would you like to research?"
+                                       required>
+                                <button type="submit" class="btn btn-primary">Send</button>
+                            </form>
+                        </div>
+
+                        <div class="loading-indicator">
+                            <div class="loading-animation">
+                                <div class="spinner-grow text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="spinner-grow text-secondary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <div class="spinner-grow text-info" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <div class="progress mt-2 mb-2">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                                     role="progressbar" 
+                                     aria-valuenow="0" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100"></div>
+                            </div>
+                            <p class="mt-2 status-text">Processing your request...</p>
+                        </div>
+
+                        <div id="website-selection" class="website-selection d-none mb-3">
+                            <h3>Suggested Websites</h3>
+                            <form id="website-form">
+                                <div class="website-list mb-3">
+                                    <!-- Websites will be listed here -->
+                                </div>
+                                <button type="submit" class="btn btn-success d-none" id="scrape-selected">
+                                    Scrape Selected Websites
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="results-container">
+                            <!-- Results will be displayed here -->
+                        </div>
                     </div>
                 </div>
             </div>

@@ -8,9 +8,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const websiteList = document.querySelector('.website-list');
     const websiteForm = document.querySelector('#website-form');
     const scrapeSelectedBtn = document.querySelector('#scrape-selected');
-    const logWindow = document.querySelector('#log-window');
+    const drawer = document.querySelector('#left-drawer');
+    const drawerToggle = document.querySelector('#drawer-toggle');
+    const drawerClose = document.querySelector('.drawer-close');
+    const drawerWrapper = document.querySelector('.drawer-wrapper');
+    const folderTree = document.querySelector('.folder-tree');
     const logContent = document.querySelector('.log-content');
-    const logCloseBtn = document.querySelector('.log-header .btn-close');
+    const progressBar = document.querySelector('.progress-bar');
+    const statusText = document.querySelector('.status-text');
 
     function addMessage(message, isUser = false) {
         const messageDiv = document.createElement('div');
@@ -18,6 +23,80 @@ document.addEventListener('DOMContentLoaded', function() {
         messageDiv.textContent = message;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    // Drawer Toggle
+    drawerToggle.addEventListener('click', () => {
+        drawer.classList.add('open');
+        drawerWrapper.classList.add('drawer-open');
+        updateFolderStructure();
+    });
+
+    drawerClose.addEventListener('click', () => {
+        drawer.classList.remove('open');
+        drawerWrapper.classList.remove('drawer-open');
+    });
+
+    // SSE Setup
+    const eventSource = new EventSource("/stream");
+    
+    eventSource.addEventListener('log', function(e) {
+        const data = JSON.parse(e.data);
+        addLogMessage(data.message, data.level);
+    });
+
+    eventSource.addEventListener('progress', function(e) {
+        const data = JSON.parse(e.data);
+        updateProgress(data);
+    });
+
+    function updateProgress(data) {
+        if (data.progress !== null) {
+            progressBar.style.width = `${data.progress}%`;
+            progressBar.setAttribute('aria-valuenow', data.progress);
+        }
+        if (data.message) {
+            statusText.textContent = data.message;
+        }
+        if (data.status === 'complete') {
+            setTimeout(() => {
+                loadingIndicator.classList.remove('active');
+                progressBar.style.width = '0%';
+                progressBar.setAttribute('aria-valuenow', 0);
+            }, 1000);
+        }
+    }
+
+    async function updateFolderStructure() {
+        try {
+            const response = await fetch('/api/folder-structure');
+            const structure = await response.json();
+            renderFolderTree(structure);
+        } catch (error) {
+            console.error('Error fetching folder structure:', error);
+        }
+    }
+
+    function renderFolderTree(node, level = 0) {
+        const div = document.createElement('div');
+        div.className = 'folder-item';
+        div.style.paddingLeft = `${level * 1.5}rem`;
+
+        const icon = document.createElement('i');
+        icon.className = `fas ${node.type === 'directory' ? 'fa-folder' : 'fa-file'} folder-icon`;
+        
+        div.appendChild(icon);
+        div.appendChild(document.createTextNode(node.name));
+
+        if (node.type === 'directory' && node.children) {
+            const childrenDiv = document.createElement('div');
+            childrenDiv.className = 'folder-children';
+            node.children.forEach(child => {
+                childrenDiv.appendChild(renderFolderTree(child, level + 1));
+            });
+            div.appendChild(childrenDiv);
+        }
+
+        return div;
+    }
     }
 
     function displayWebsites(websites) {
