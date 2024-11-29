@@ -1,32 +1,28 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // DOM Elements
+    const chatForm = document.getElementById('chat-form');
+    const userInput = document.getElementById('user-input');
     const chatMessages = document.querySelector('.chat-messages');
-    const chatForm = document.querySelector('#chat-form');
-    const userInput = document.querySelector('#user-input');
-    const loadingIndicator = document.querySelector('.loading-indicator');
-    const resultsContainer = document.querySelector('.results-container');
-    const websiteSelection = document.querySelector('#website-selection');
+    const websiteSelection = document.getElementById('website-selection');
     const websiteList = document.querySelector('.website-list');
-    const websiteForm = document.querySelector('#website-form');
-    const scrapeSelectedBtn = document.querySelector('#scrape-selected');
-    const drawer = document.querySelector('#left-drawer');
-    const drawerToggle = document.querySelector('#drawer-toggle');
-    const drawerClose = document.querySelector('.drawer-close');
-    const drawerWrapper = document.querySelector('.drawer-wrapper');
-    const folderTree = document.querySelector('.folder-tree');
-    const logContent = document.querySelector('.log-content');
+    const websiteForm = document.getElementById('website-form');
+    const scrapeSelectedBtn = document.getElementById('scrape-selected');
+    const loadingIndicator = document.querySelector('.loading-indicator');
     const progressBar = document.querySelector('.progress-bar');
     const statusText = document.querySelector('.status-text');
+    const resultsContainer = document.querySelector('.results-container');
+    const logWindow = document.querySelector('.log-window');
+    const logContent = document.querySelector('.log-content');
+    const logCloseBtn = document.querySelector('.log-close-btn');
+    const drawer = document.getElementById('left-drawer');
+    const drawerWrapper = document.querySelector('.drawer-wrapper');
+    const drawerToggle = document.getElementById('drawer-toggle');
+    const drawerClose = document.querySelector('.drawer-close');
 
-    function addMessage(message, isUser = false) {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        messageDiv.textContent = message;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    // Drawer Toggle
+    // Event Listeners
     drawerToggle.addEventListener('click', () => {
-        drawer.classList.add('open');
-        drawerWrapper.classList.add('drawer-open');
+        drawer.classList.toggle('open');
+        drawerWrapper.classList.toggle('drawer-open');
         updateFolderStructure();
     });
 
@@ -34,6 +30,19 @@ document.addEventListener('DOMContentLoaded', function() {
         drawer.classList.remove('open');
         drawerWrapper.classList.remove('drawer-open');
     });
+
+    logCloseBtn.addEventListener('click', () => {
+        logWindow.classList.add('d-none');
+    });
+
+    // Message Functions
+    function addMessage(message, isUser = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+        messageDiv.textContent = message;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
 
     // SSE Setup
     const eventSource = new EventSource("/stream");
@@ -47,6 +56,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = JSON.parse(e.data);
         updateProgress(data);
     });
+
+    eventSource.onerror = function(e) {
+        console.error('SSE Error:', e);
+        eventSource.close();
+    };
 
     function updateProgress(data) {
         if (data.progress !== null) {
@@ -68,10 +82,16 @@ document.addEventListener('DOMContentLoaded', function() {
     async function updateFolderStructure() {
         try {
             const response = await fetch('/api/folder-structure');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const structure = await response.json();
-            renderFolderTree(structure);
+            const folderTree = document.querySelector('.folder-tree');
+            folderTree.innerHTML = '';
+            folderTree.appendChild(renderFolderTree(structure));
         } catch (error) {
             console.error('Error fetching folder structure:', error);
+            addLogMessage(`Failed to update folder structure: ${error.message}`, 'error');
         }
     }
 
@@ -97,14 +117,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return div;
     }
-    }
 
     function displayWebsites(websites) {
         if (!websites || websites.length === 0) return;
         
         websiteList.innerHTML = websites.map((url, index) => `
             <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" value="${url}" id="website-${index}">
+                <input class="form-check-input" type="checkbox" value="${url}" id="website-${index}" checked>
                 <label class="form-check-label" for="website-${index}">
                     ${url}
                 </label>
@@ -126,8 +145,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <p>Found ${item.images.length} relevant images</p>
                         <div class="metadata">
                             <h5>Metadata:</h5>
-                            <p>Title: ${item.metadata.title}</p>
-                            <p>Description: ${item.metadata.description}</p>
+                            <p>Title: ${item.metadata.title || 'N/A'}</p>
+                            <p>Description: ${item.metadata.description || 'N/A'}</p>
                         </div>
                     </div>
                 `).join('')}
@@ -136,17 +155,23 @@ document.addEventListener('DOMContentLoaded', function() {
         resultsContainer.innerHTML = resultsHtml;
     }
 
+    function addLogMessage(message, level = 'info') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `log-message ${level}`;
+        msgDiv.textContent = message;
+        logContent.appendChild(msgDiv);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    // Form Handlers
     chatForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const message = userInput.value.trim();
         if (!message) return;
 
-        // Add user message
         addMessage(message, true);
         userInput.value = '';
-
-        // Show loading indicator
         loadingIndicator.classList.add('active');
 
         try {
@@ -158,34 +183,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ message })
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            
-            // Add bot response
             addMessage(data.response);
             
-            // Display website selection
             if (data.websites && data.websites.length > 0) {
                 displayWebsites(data.websites);
             }
-
         } catch (error) {
             addMessage('Error processing your request. Please try again.');
-            console.error('Error:', error);
+            addLogMessage(`Chat error: ${error.message}`, 'error');
         } finally {
             loadingIndicator.classList.remove('active');
         }
-    });
-
-    function addLogMessage(message, level = 'info') {
-        const msgDiv = document.createElement('div');
-        msgDiv.className = `log-message ${level}`;
-        msgDiv.textContent = message;
-        logContent.appendChild(msgDiv);
-        logContent.scrollTop = logContent.scrollHeight;
-    }
-
-    logCloseBtn.addEventListener('click', function() {
-        logWindow.classList.add('d-none');
     });
 
     websiteForm.addEventListener('submit', async function(e) {
@@ -202,6 +215,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         loadingIndicator.classList.add('active');
         scrapeSelectedBtn.disabled = true;
+        addLogMessage('Starting web scraping process...', 'info');
 
         try {
             const response = await fetch('/api/scrape', {
@@ -212,32 +226,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ websites: selectedWebsites })
             });
 
-            const data = await response.json();
-            
-            // Display analyzed results
-            if (data.analyzed_data) {
-                displayResults(data);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            // Hide website selection after scraping
+            const data = await response.json();
+            
+            if (data.analyzed_data) {
+                displayResults(data);
+                addLogMessage('Analysis completed successfully', 'info');
+            }
+
             websiteSelection.classList.add('d-none');
             scrapeSelectedBtn.classList.add('d-none');
 
         } catch (error) {
-            console.error('Error:', error);
+            addLogMessage(`Scraping error: ${error.message}`, 'error');
             
-            // Handle error response from backend
             if (error.response) {
                 const errorData = await error.response.json();
                 const errorMessage = errorData.message || errorData.error || 'Unknown error occurred';
                 addMessage(`Error: ${errorMessage}`);
                 
-                // Display individual website errors if available
                 if (errorData.errors && errorData.errors.length > 0) {
-                    const errorList = errorData.errors.map(err => 
-                        `- ${err.url}: ${err.error}`
-                    ).join('\n');
-                    addMessage(`Detailed errors:\n${errorList}`);
+                    errorData.errors.forEach(err => {
+                        addLogMessage(`Failed to scrape ${err.url}: ${err.error}`, 'error');
+                    });
                 }
             } else {
                 addMessage('Network error occurred. Please check your connection and try again.');
