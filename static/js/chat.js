@@ -184,6 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const div = document.createElement('div');
         div.className = 'folder-item';
         div.style.paddingLeft = `${level * 1.5}rem`;
+        div.dataset.path = node.path || '';
 
         const icon = document.createElement('i');
         icon.className = `fas ${node.type === 'directory' ? 'fa-folder' : 'fa-file'} folder-icon`;
@@ -191,13 +192,80 @@ document.addEventListener('DOMContentLoaded', function() {
         div.appendChild(icon);
         div.appendChild(document.createTextNode(node.name));
 
-        if (node.type === 'directory' && node.children) {
+        // Add file type icon for files
+        if (node.type === 'file') {
+            const fileExtension = node.name.split('.').pop().toLowerCase();
+            const fileTypeIcon = document.createElement('span');
+            fileTypeIcon.className = 'file-type-icon';
+            fileTypeIcon.textContent = fileExtension;
+            div.appendChild(fileTypeIcon);
+
+            // Add download icon for files
+            const downloadIcon = document.createElement('i');
+            downloadIcon.className = 'fas fa-download download-icon';
+            downloadIcon.title = 'Download file';
+            downloadIcon.onclick = async (e) => {
+                e.stopPropagation();
+                try {
+                    const response = await fetch(`/api/download?path=${encodeURIComponent(node.path)}`);
+                    if (!response.ok) throw new Error('Download failed');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = node.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } catch (error) {
+                    console.error('Download error:', error);
+                    addLogMessage(`Failed to download ${node.name}`, 'error');
+                }
+            };
+            div.appendChild(downloadIcon);
+        }
+
+        if (node.type === 'directory') {
+            // Add download folder icon
+            const downloadFolderIcon = document.createElement('i');
+            downloadFolderIcon.className = 'fas fa-file-archive download-icon';
+            downloadFolderIcon.title = 'Download folder as ZIP';
+            downloadFolderIcon.onclick = async (e) => {
+                e.stopPropagation();
+                try {
+                    const response = await fetch(`/api/download-folder?path=${encodeURIComponent(node.path)}`);
+                    if (!response.ok) throw new Error('Download failed');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${node.name}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } catch (error) {
+                    console.error('Download error:', error);
+                    addLogMessage(`Failed to download ${node.name}`, 'error');
+                }
+            };
+            div.appendChild(downloadFolderIcon);
+
+            // Add expandable children
             const childrenDiv = document.createElement('div');
-            childrenDiv.className = 'folder-children';
+            childrenDiv.className = 'folder-children d-none';
             node.children.forEach(child => {
                 childrenDiv.appendChild(renderFolderTree(child, level + 1));
             });
             div.appendChild(childrenDiv);
+
+            // Add click handler for folders
+            div.onclick = (e) => {
+                e.stopPropagation();
+                div.classList.toggle('expanded');
+                childrenDiv.classList.toggle('d-none');
+            };
         }
 
         return div;

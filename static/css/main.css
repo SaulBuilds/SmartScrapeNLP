@@ -65,18 +65,60 @@
 
 .folder-tree {
     margin-bottom: 1rem;
+    color: var(--bs-light);
 }
 
 .folder-item {
-    padding: 0.25rem 0;
+    padding: 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s ease;
+    margin: 0.25rem 0;
+    position: relative;
+}
+
+.folder-item:hover {
+    background-color: var(--bs-gray-700);
 }
 
 .folder-item .folder-icon {
-    margin-right: 0.5rem;
+    margin-right: 0.75rem;
+    width: 1.2em;
+    text-align: center;
+    color: var(--bs-info);
+}
+
+.folder-item .folder-icon.fa-folder {
+    color: var(--bs-warning);
+}
+
+.folder-item .download-icon {
+    margin-left: auto;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    color: var(--bs-info);
+}
+
+.folder-item:hover .download-icon {
+    opacity: 1;
 }
 
 .folder-children {
     margin-left: 1.5rem;
+    border-left: 1px solid var(--bs-gray-700);
+    padding-left: 0.5rem;
+}
+
+.folder-item.expanded > .folder-icon.fa-folder::before {
+    content: "\f07c";
+}
+
+.folder-item .file-type-icon {
+    font-size: 0.8em;
+    margin-left: 0.5rem;
+    color: var(--bs-gray-500);
 }
 
 .chat-container {

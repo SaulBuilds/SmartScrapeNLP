@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, Response, send_file
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import DeclarativeBase
 from scraper.web_crawler import WebCrawler
@@ -9,6 +9,7 @@ from utils.file_manager import FileManager
 from scraper.content_analyzer import ContentAnalyzer
 import json
 import time
+import shutil
 from queue import Queue
 from threading import Thread
 
@@ -288,6 +289,58 @@ def get_folder_structure():
             'details': str(e)
         }), 500
 
+@app.route('/api/download')
+def download_file():
+    """Download a single file"""
+    try:
+        file_path = request.args.get('path')
+        if not file_path:
+            return jsonify({'error': 'No file path provided'}), 400
+            
+        # Ensure the file is within the data directory
+        abs_path = os.path.abspath(os.path.join(file_manager.base_dir, file_path))
+        if not abs_path.startswith(file_manager.base_dir):
+            return jsonify({'error': 'Invalid file path'}), 403
+            
+        if not os.path.isfile(abs_path):
+            return jsonify({'error': 'File not found'}), 404
+            
+        return send_file(abs_path, as_attachment=True)
+    except Exception as e:
+        logger.error(f"File download failed: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Download failed', 'details': str(e)}), 500
+
+@app.route('/api/download-folder')
+def download_folder():
+    """Download a folder as ZIP"""
+    try:
+        folder_path = request.args.get('path')
+        if not folder_path:
+            return jsonify({'error': 'No folder path provided'}), 400
+            
+        # Ensure the folder is within the data directory
+        abs_path = os.path.abspath(os.path.join(file_manager.base_dir, folder_path))
+        if not abs_path.startswith(file_manager.base_dir):
+            return jsonify({'error': 'Invalid folder path'}), 403
+            
+        if not os.path.isdir(abs_path):
+            return jsonify({'error': 'Folder not found'}), 404
+            
+        # Create a temporary file for the ZIP
+        temp_file = os.path.join(file_manager.base_dir, f'temp_{int(time.time())}.zip')
+        try:
+            shutil.make_archive(temp_file[:-4], 'zip', abs_path)
+            return send_file(temp_file, as_attachment=True, download_name=f"{os.path.basename(folder_path)}.zip")
+        finally:
+            # Clean up temp file in background
+            def cleanup():
+                time.sleep(1)  # Wait for file to be sent
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            Thread(target=cleanup).start()
+    except Exception as e:
+        logger.error(f"Folder download failed: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Download failed', 'details': str(e)}), 500
 with app.app_context():
     import models
     db.create_all()
