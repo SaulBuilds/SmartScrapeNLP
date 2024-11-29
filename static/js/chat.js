@@ -8,6 +8,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const websiteList = document.querySelector('.website-list');
     const websiteForm = document.querySelector('#website-form');
     const scrapeSelectedBtn = document.querySelector('#scrape-selected');
+    const logWindow = document.querySelector('#log-window');
+    const logContent = document.querySelector('.log-content');
+    const logCloseBtn = document.querySelector('.log-header .btn-close');
 
     function addMessage(message, isUser = false) {
         const messageDiv = document.createElement('div');
@@ -94,8 +97,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    function addLogMessage(message, level = 'info') {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `log-message ${level}`;
+        msgDiv.textContent = message;
+        logContent.appendChild(msgDiv);
+        logContent.scrollTop = logContent.scrollHeight;
+    }
+
+    logCloseBtn.addEventListener('click', function() {
+        logWindow.classList.add('d-none');
+    });
+
     websiteForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        logWindow.classList.remove('d-none');
         
         const selectedWebsites = Array.from(websiteList.querySelectorAll('input[type="checkbox"]:checked'))
             .map(checkbox => checkbox.value);

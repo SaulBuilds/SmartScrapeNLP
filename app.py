@@ -13,6 +13,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+logger = logging.getLogger(__name__)
 
 class Base(DeclarativeBase):
     pass
@@ -22,6 +23,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY") or "intelligent_scraper_key"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///scraper.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db.init_app(app)
 
 # Initialize components

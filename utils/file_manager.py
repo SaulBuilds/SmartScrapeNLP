@@ -11,7 +11,7 @@ class FileManager:
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp()
         self.active_files = set()
-        self.base_dir = os.path.expanduser("~/Desktop")
+        self.base_dir = os.path.join(os.getcwd(), "data")
         self._ensure_base_directory()
 
     def _ensure_base_directory(self):
