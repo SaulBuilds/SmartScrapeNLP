@@ -1,29 +1,38 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // DOM Elements with null checks
-    const elements = {
-        chatForm: document.getElementById('chat-form'),
-        userInput: document.getElementById('user-input'),
-        chatMessages: document.querySelector('.chat-messages'),
-        websiteSelection: document.getElementById('website-selection'),
-        websiteList: document.querySelector('.website-list'),
-        websiteForm: document.getElementById('website-form'),
-        scrapeSelectedBtn: document.getElementById('scrape-selected'),
-        loadingIndicator: document.querySelector('.loading-indicator'),
-        progressBar: document.querySelector('.progress-bar'),
-        statusText: document.querySelector('.status-text'),
-        resultsContainer: document.querySelector('.results-container'),
-        logWindow: document.querySelector('.log-window'),
-        logContent: document.querySelector('.log-content'),
-        drawer: document.getElementById('left-drawer'),
-        drawerWrapper: document.querySelector('.drawer-wrapper'),
-        drawerToggle: document.getElementById('drawer-toggle'),
-        drawerClose: document.querySelector('.drawer-close'),
-        scrapingProgress: document.querySelector('.scraping-progress'),
-        currentTask: document.querySelector('.current-task'),
-        statsContainer: document.querySelector('.stats-container'),
-        pauseScrapingBtn: document.querySelector('.pause-scraping'),
-        cancelScrapingBtn: document.querySelector('.cancel-scraping')
-    };
+    // DOM Elements with null checks and error handling
+    const elements = {};
+    
+    // Helper function to safely get elements
+    function getElement(id, selector = null) {
+        const element = selector ? document.querySelector(selector) : document.getElementById(id);
+        if (!element) {
+            console.warn(`Element not found: ${selector || id}`);
+        }
+        return element;
+    }
+
+    // Initialize elements with error handling
+    elements.chatForm = getElement('chat-form');
+    elements.userInput = getElement('user-input');
+    elements.chatMessages = getElement(null, '.chat-messages');
+    elements.websiteSelection = getElement('website-selection');
+    elements.websiteList = getElement(null, '.website-list');
+    elements.websiteForm = getElement('website-form');
+    elements.scrapeSelectedBtn = getElement('scrape-selected');
+    elements.loadingIndicator = getElement(null, '.loading-indicator');
+    elements.progressBar = getElement(null, '.progress-bar');
+    elements.statusText = getElement(null, '.status-text');
+    elements.resultsContainer = getElement(null, '.results-container');
+    elements.logContent = getElement(null, '.log-content');
+    elements.drawer = getElement('left-drawer');
+    elements.drawerWrapper = getElement(null, '.drawer-wrapper');
+    elements.drawerToggle = getElement('drawer-toggle');
+    elements.drawerClose = getElement(null, '.drawer-close');
+    elements.scrapingProgress = getElement(null, '.scraping-progress');
+    elements.currentTask = getElement(null, '.current-task');
+    elements.statsContainer = getElement(null, '.stats-container');
+    elements.pauseScrapingBtn = getElement(null, '.pause-scraping');
+    elements.cancelScrapingBtn = getElement(null, '.cancel-scraping');
 
     // Initialize progress state
     let isScrapingPaused = false;
@@ -185,12 +194,38 @@ document.addEventListener('DOMContentLoaded', function() {
         div.className = 'folder-item';
         div.style.paddingLeft = `${level * 1.5}rem`;
         div.dataset.path = node.path || '';
+        
+        // Add tooltip for long names
+        if (node.name.length > 30) {
+            div.title = node.name;
+        }
 
         const icon = document.createElement('i');
-        icon.className = `fas ${node.type === 'directory' ? 'fa-folder' : 'fa-file'} folder-icon`;
+        icon.className = `fas ${node.type === 'directory' ? 'fa-folder' : getFileIcon(node.name)} folder-icon`;
         
         div.appendChild(icon);
-        div.appendChild(document.createTextNode(node.name));
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = node.name.length > 30 ? node.name.substring(0, 27) + '...' : node.name;
+        div.appendChild(nameSpan);
+
+    function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const iconMap = {
+            'html': 'fa-code',
+            'css': 'fa-css3',
+            'js': 'fa-js',
+            'json': 'fa-file-code',
+            'txt': 'fa-file-alt',
+            'md': 'fa-file-alt',
+            'jpg': 'fa-image',
+            'jpeg': 'fa-image',
+            'png': 'fa-image',
+            'gif': 'fa-image',
+            'pdf': 'fa-file-pdf'
+        };
+        return iconMap[ext] || 'fa-file';
+    }
 
         // Add file type icon for files
         if (node.type === 'file') {
