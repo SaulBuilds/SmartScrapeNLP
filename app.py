@@ -180,8 +180,23 @@ def scrape():
                 if not web_crawler.is_valid_url(url):
                     raise ValueError(f"Invalid URL format: {url}")
                 
+                # Progress callback for the crawler
+                def progress_update(message, sub_progress):
+                    current_progress = ((index - 1) * 100 + sub_progress) / total_websites
+                    send_sse_message(
+                        client_id,
+                        message,
+                        'progress',
+                        {
+                            'progress': current_progress,
+                            'message': message,
+                            'url': url,
+                            'preview_html': None  # Will be updated with actual preview content
+                        }
+                    )
+
                 # Scrape website
-                content = web_crawler.scrape_website(url)
+                content = web_crawler.scrape_website(url, progress_callback=progress_update)
                 if not content:
                     error_msg = 'Failed to scrape content'
                     errors.append({
@@ -192,6 +207,18 @@ def scrape():
                     logger.error(f"Error scraping {url}: {error_msg}")
                     send_sse_message(client_id, f"Failed to scrape {url}", 'log', 'error')
                     continue
+
+                # Send preview of the content
+                if content.get('html'):
+                    send_sse_message(
+                        client_id,
+                        f"Preview for {url}",
+                        'preview',
+                        {
+                            'url': url,
+                            'preview_html': content['html'][:1000]  # Send first 1000 chars as preview
+                        }
+                    )
                 
                 # Save content in different formats
                 try:

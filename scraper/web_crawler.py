@@ -123,7 +123,34 @@ class WebCrawler:
             logger.error(f"Error extracting images: {str(e)}", exc_info=True)
             return []
 
-    def scrape_website(self, url):
+    def _normalize_url(self, base_url, relative_url):
+        """Normalize relative URLs to absolute URLs"""
+        try:
+            return urljoin(base_url, relative_url)
+        except Exception as e:
+            logger.error(f"Error normalizing URL {relative_url} with base {base_url}: {str(e)}")
+            return None
+
+    def _extract_links(self, soup, base_url):
+        """Extract and normalize all links from the page"""
+        links = set()
+        try:
+            for anchor in soup.find_all('a', href=True):
+                href = anchor['href']
+                if href.startswith('#') or href.startswith('javascript:'):
+                    continue
+                    
+                absolute_url = self._normalize_url(base_url, href)
+                if absolute_url and self.is_valid_url(absolute_url):
+                    links.add(absolute_url)
+                    
+            logger.info(f"Found {len(links)} valid links on {base_url}")
+            return links
+        except Exception as e:
+            logger.error(f"Error extracting links from {base_url}: {str(e)}")
+            return set()
+
+    def scrape_website(self, url, progress_callback=None):
         """Scrape content from a given URL with enhanced content cleaning and error handling"""
         try:
             if not self.is_valid_url(url):
@@ -140,6 +167,10 @@ class WebCrawler:
             # Respect rate limiting
             time.sleep(self.delay)
             self.visited_urls.add(url)
+            
+            logger.info(f"Starting to scrape: {url}")
+            if progress_callback:
+                progress_callback(f"Starting to scrape {url}", 0)
             
             # Try trafilatura first for main content extraction
             logger.info(f"Attempting to scrape content from: {url}")
@@ -168,14 +199,29 @@ class WebCrawler:
 
             # Fallback to BeautifulSoup if trafilatura fails
             logger.info(f"Trafilatura extraction failed, falling back to BeautifulSoup for {url}")
+            logger.info(f"Downloading content from: {url}")
+            if progress_callback:
+                progress_callback(f"Downloading content from {url}", 20)
+                
             response = requests.get(url, headers=self.headers, timeout=10)
             response.raise_for_status()
             
+            logger.info(f"Parsing content from: {url}")
+            if progress_callback:
+                progress_callback(f"Parsing content from {url}", 40)
+                
             soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Extract links before cleaning
+            links = self._extract_links(soup, url)
+            logger.info(f"Found {len(links)} links on {url}")
             
             # Remove unwanted elements
             for element in soup(['script', 'style', 'nav', 'footer', 'iframe', 'header']):
                 element.decompose()
+                
+            if progress_callback:
+                progress_callback(f"Processing content from {url}", 60)
             
             # Extract main content
             main_content = soup.find('main') or soup.find('article') or soup.find('div', {'class': ['content', 'main', 'article']})

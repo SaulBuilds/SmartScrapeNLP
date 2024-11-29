@@ -74,17 +74,24 @@
 
                         <div class="scraping-progress d-none">
                             <h4>Scraping Progress</h4>
+                            <div class="current-url fw-bold mb-2"></div>
                             <div class="current-task mb-2"></div>
                             <div class="progress mb-3">
                                 <div class="progress-bar" role="progressbar"></div>
+                            </div>
+                            <div class="preview-window mb-3">
+                                <h5>Content Preview</h5>
+                                <div class="preview-content p-3 border rounded bg-dark"></div>
                             </div>
                             <div class="stats-container">
                                 <div class="processed">Processed: <span>0</span></div>
                                 <div class="successful">Successful: <span>0</span></div>
                                 <div class="failed">Failed: <span>0</span></div>
                             </div>
-                            <button class="btn btn-warning btn-sm pause-scraping">Pause</button>
-                            <button class="btn btn-danger btn-sm cancel-scraping">Cancel</button>
+                            <div class="mt-3">
+                                <button class="btn btn-warning btn-sm pause-scraping">Pause</button>
+                                <button class="btn btn-danger btn-sm cancel-scraping">Cancel</button>
+                            </div>
                         </div>
 
                         <div id="website-selection" class="website-selection d-none mb-3">

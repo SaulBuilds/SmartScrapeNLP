@@ -12,27 +12,47 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Initialize elements with error handling
-    elements.chatForm = getElement('chat-form');
-    elements.userInput = getElement('user-input');
-    elements.chatMessages = getElement(null, '.chat-messages');
-    elements.websiteSelection = getElement('website-selection');
-    elements.websiteList = getElement(null, '.website-list');
-    elements.websiteForm = getElement('website-form');
-    elements.scrapeSelectedBtn = getElement('scrape-selected');
-    elements.loadingIndicator = getElement(null, '.loading-indicator');
-    elements.progressBar = getElement(null, '.progress-bar');
-    elements.statusText = getElement(null, '.status-text');
-    elements.resultsContainer = getElement(null, '.results-container');
-    elements.logContent = getElement(null, '.log-content');
-    elements.drawer = getElement('left-drawer');
-    elements.drawerWrapper = getElement(null, '.drawer-wrapper');
-    elements.drawerToggle = getElement('drawer-toggle');
-    elements.drawerClose = getElement(null, '.drawer-close');
-    elements.scrapingProgress = getElement(null, '.scraping-progress');
-    elements.currentTask = getElement(null, '.current-task');
-    elements.statsContainer = getElement(null, '.stats-container');
-    elements.pauseScrapingBtn = getElement(null, '.pause-scraping');
-    elements.cancelScrapingBtn = getElement(null, '.cancel-scraping');
+    const requiredElements = {
+        'chat-form': 'form#chat-form',
+        'user-input': 'input#user-input',
+        'chat-messages': '.chat-messages',
+        'website-selection': '#website-selection',
+        'website-list': '.website-list',
+        'website-form': '#website-form',
+        'scrape-selected': '#scrape-selected',
+        'loading-indicator': '.loading-indicator',
+        'progress-bar': '.progress-bar',
+        'status-text': '.status-text',
+        'results-container': '.results-container',
+        'log-content': '.log-content',
+        'drawer': '#left-drawer',
+        'drawer-wrapper': '.drawer-wrapper',
+        'drawer-toggle': '#drawer-toggle',
+        'drawer-close': '.drawer-close',
+        'scraping-progress': '.scraping-progress',
+        'current-task': '.current-task',
+        'current-url': '.current-url',
+        'preview-content': '.preview-content',
+        'stats-container': '.stats-container',
+        'pause-scraping': '.pause-scraping',
+        'cancel-scraping': '.cancel-scraping'
+    };
+
+    // Initialize all elements
+    Object.entries(requiredElements).forEach(([key, selector]) => {
+        elements[key] = getElement(null, selector);
+        if (!elements[key]) {
+            console.error(`Required element not found: ${selector}`);
+        }
+    });
+
+    // Verify critical elements
+    const criticalElements = ['chat-form', 'user-input', 'chat-messages'];
+    const missingCritical = criticalElements.filter(key => !elements[key]);
+    if (missingCritical.length > 0) {
+        console.error(`Critical elements missing: ${missingCritical.join(', ')}`);
+        addLogMessage('Error: Some critical UI elements are missing', 'error');
+    }
 
     // Initialize progress state
     let isScrapingPaused = false;
@@ -143,6 +163,14 @@ document.addEventListener('DOMContentLoaded', function() {
             elements.currentTask.textContent = data.message;
         }
 
+        if (data.url && elements['current-url']) {
+            elements['current-url'].textContent = `Current URL: ${data.url}`;
+        }
+
+        if (data.preview_html && elements['preview-content']) {
+            elements['preview-content'].innerHTML = data.preview_html;
+        }
+
         if (data.stats) {
             updateStats(data.stats);
         }
@@ -150,6 +178,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (data.status === 'complete') {
             elements.scrapingProgress.classList.add('d-none');
             currentProgress = 0;
+            if (elements['preview-content']) {
+                elements['preview-content'].innerHTML = '';
+            }
         }
     }
 
