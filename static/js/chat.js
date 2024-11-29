@@ -31,9 +31,11 @@ document.addEventListener('DOMContentLoaded', function() {
         drawerWrapper.classList.remove('drawer-open');
     });
 
-    logCloseBtn.addEventListener('click', () => {
-        logWindow.classList.add('d-none');
-    });
+    if (logCloseBtn) {
+        logCloseBtn.addEventListener('click', () => {
+            logWindow.classList.add('d-none');
+        });
+    }
 
     // Message Functions
     function addMessage(message, isUser = false) {

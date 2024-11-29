@@ -13,7 +13,8 @@ class WebCrawler:
         self.delay = 1  # Seconds between requests
 
     def scrape_website(self, url):
-        """Scrape content from a given URL with relevance checking"""
+        """Scrape content from a given URL with enhanced content cleaning and image handling"""
+        self.current_base_url = url  # Store base URL for relative path resolution
         try:
             # Respect robots.txt and rate limiting
             time.sleep(self.delay)
@@ -54,11 +55,35 @@ class WebCrawler:
             return False
             
     def download_image(self, url):
-        """Download image from URL"""
+        """Download image from URL with enhanced error handling"""
         try:
+            # Convert relative URLs to absolute URLs
+            if not url.startswith(('http://', 'https://')):
+                if hasattr(self, 'current_base_url'):
+                    url = urljoin(self.current_base_url, url)
+                else:
+                    raise ValueError("Base URL not set for relative URL resolution")
+
             response = requests.get(url, headers=self.headers, timeout=10)
-            if response.status_code == 200:
-                return response.content
+            response.raise_for_status()  # Raise exception for bad status codes
+            
+            content_type = response.headers.get('content-type', '')
+            if not content_type.startswith('image/'):
+                raise ValueError(f"Invalid content type: {content_type}")
+                
+            return {
+                'content': response.content,
+                'content_type': content_type,
+                'size': len(response.content),
+                'url': response.url  # Final URL after any redirects
+            }
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout while downloading image: {url}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to download image {url}: {str(e)}")
+        except ValueError as e:
+            logger.error(str(e))
         except Exception as e:
-            print(f"Error downloading image: {str(e)}")
+            logger.error(f"Unexpected error downloading image {url}: {str(e)}")
         return None

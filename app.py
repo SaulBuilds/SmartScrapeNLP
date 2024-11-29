@@ -90,16 +90,29 @@ def stream():
 @app.route('/api/chat', methods=['POST'])
 def chat():
     """Handle chat messages and return relevant websites"""
+    client_id = request.headers.get('X-Client-Id', str(time.time()))
     try:
         message = request.json.get('message')
         if not message:
-            return jsonify({'error': 'No message provided'}), 400
+            logger.warning("Empty message received in chat endpoint")
+            return jsonify({'error': 'No message provided', 'details': 'Message content is required'}), 400
             
         logger.info(f"Processing chat message: {message[:50]}...")
+        send_sse_message(client_id, "Processing your request...", 'log', 'info')
         
         # Process user input using LLM
         result = llm_handler.process_user_input(message)
+        if not result or 'error' in result:
+            error_msg = result.get('message', 'Unknown error in LLM processing')
+            logger.error(f"LLM processing failed: {error_msg}")
+            send_sse_message(client_id, f"Error: {error_msg}", 'log', 'error')
+            return jsonify({
+                'error': 'LLM processing failed',
+                'details': error_msg
+            }), 500
+        
         logger.info(f"LLM suggested {len(result['websites'])} websites")
+        send_sse_message(client_id, f"Found {len(result['websites'])} relevant websites", 'log', 'info')
         
         return jsonify({
             'response': result['message'],
@@ -107,10 +120,13 @@ def chat():
         })
         
     except Exception as e:
-        logger.error(f"Chat processing error: {str(e)}", exc_info=True)
+        error_msg = str(e)
+        logger.error(f"Chat processing error: {error_msg}", exc_info=True)
+        send_sse_message(client_id, f"Error: {error_msg}", 'log', 'error')
         return jsonify({
             'error': 'Failed to process chat message',
-            'message': str(e)
+            'details': error_msg,
+            'type': type(e).__name__
         }), 500
 
 @app.route('/api/scrape', methods=['POST'])
@@ -121,14 +137,27 @@ def scrape():
     try:
         websites = request.json.get('websites', [])
         if not websites:
-            return jsonify({'error': 'No websites provided'}), 400
+            logger.warning("No websites provided for scraping")
+            return jsonify({
+                'error': 'No websites provided',
+                'details': 'At least one website URL is required'
+            }), 400
             
         logger.info(f"Starting scraping process for {len(websites)} websites")
+        send_sse_message(client_id, f"Starting to process {len(websites)} websites", 'log', 'info')
         
         # Create session directory
-        session_dir = file_manager.create_session_directory()
-        if not session_dir:
-            raise Exception("Failed to create session directory")
+        try:
+            session_dir = file_manager.create_session_directory()
+            if not session_dir:
+                raise Exception("Failed to create session directory")
+        except Exception as e:
+            logger.error(f"Session directory creation failed: {str(e)}", exc_info=True)
+            send_sse_message(client_id, "Failed to initialize scraping session", 'log', 'error')
+            return jsonify({
+                'error': 'Session initialization failed',
+                'details': str(e)
+            }), 500
             
         analyzed_data = []
         errors = []
@@ -146,21 +175,33 @@ def scrape():
                 
                 logger.info(f"Scraping website: {url}")
                 
+                # Validate URL
+                if not web_crawler.is_valid_url(url):
+                    raise ValueError(f"Invalid URL format: {url}")
+                
                 # Scrape website
                 content = web_crawler.scrape_website(url)
                 if not content:
                     error_msg = 'Failed to scrape content'
-                    errors.append({'url': url, 'error': error_msg})
+                    errors.append({
+                        'url': url,
+                        'error': error_msg,
+                        'type': 'content_extraction_error'
+                    })
                     logger.error(f"Error scraping {url}: {error_msg}")
                     send_sse_message(client_id, f"Failed to scrape {url}", 'log', 'error')
                     continue
                 
                 # Save raw content
-                file_manager.save_content(
-                    session_dir,
-                    f"raw_{index}.html",
-                    content
-                )
+                try:
+                    file_manager.save_content(
+                        session_dir,
+                        f"raw_{index}.html",
+                        content
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to save content for {url}: {str(e)}")
+                    send_sse_message(client_id, f"Failed to save content from {url}", 'log', 'error')
                 
                 # Analyze content
                 logger.info(f"Analyzing content from {url}")
@@ -178,9 +219,15 @@ def scrape():
                         'info'
                     )
                     
+            except ValueError as e:
+                error_msg = str(e)
+                errors.append({'url': url, 'error': error_msg, 'type': 'validation_error'})
+                logger.error(f"Validation error for {url}: {error_msg}")
+                send_sse_message(client_id, f"Error: {error_msg}", 'log', 'error')
+                
             except Exception as e:
                 error_msg = str(e)
-                errors.append({'url': url, 'error': error_msg})
+                errors.append({'url': url, 'error': error_msg, 'type': type(e).__name__})
                 logger.error(f"Error processing {url}: {error_msg}", exc_info=True)
                 send_sse_message(
                     client_id,
@@ -193,7 +240,7 @@ def scrape():
             logger.error("All websites failed to process")
             return jsonify({
                 'error': 'Content analysis failed',
-                'message': 'All websites failed to process',
+                'details': 'All websites failed to process',
                 'errors': errors
             }), 500
             
@@ -210,14 +257,22 @@ def scrape():
             'analyzed_data': analyzed_data,
             'session_dir': session_dir,
             'errors': errors,
-            'message': 'Scraping completed successfully'
+            'message': 'Scraping completed successfully',
+            'stats': {
+                'total': len(websites),
+                'successful': len(analyzed_data),
+                'failed': len(errors)
+            }
         })
         
     except Exception as e:
-        logger.error(f"Scraping process failed: {str(e)}", exc_info=True)
+        error_msg = str(e)
+        logger.error(f"Scraping process failed: {error_msg}", exc_info=True)
+        send_sse_message(client_id, f"Fatal error: {error_msg}", 'log', 'error')
         return jsonify({
             'error': 'Scraping process failed',
-            'message': str(e)
+            'details': error_msg,
+            'type': type(e).__name__
         }), 500
 
 @app.route('/api/folder-structure')
@@ -228,7 +283,10 @@ def get_folder_structure():
         return jsonify(structure)
     except Exception as e:
         logger.error(f"Failed to get folder structure: {str(e)}", exc_info=True)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'error': 'Failed to get folder structure',
+            'details': str(e)
+        }), 500
 
 with app.app_context():
     import models
