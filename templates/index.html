@@ -69,14 +69,22 @@
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
                             </div>
-                            <div class="progress mt-2 mb-2">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                                     role="progressbar" 
-                                     aria-valuenow="0" 
-                                     aria-valuemin="0" 
-                                     aria-valuemax="100"></div>
-                            </div>
                             <p class="mt-2 status-text">Processing your request...</p>
+                        </div>
+
+                        <div class="scraping-progress d-none">
+                            <h4>Scraping Progress</h4>
+                            <div class="current-task mb-2"></div>
+                            <div class="progress mb-3">
+                                <div class="progress-bar" role="progressbar"></div>
+                            </div>
+                            <div class="stats-container">
+                                <div class="processed">Processed: <span>0</span></div>
+                                <div class="successful">Successful: <span>0</span></div>
+                                <div class="failed">Failed: <span>0</span></div>
+                            </div>
+                            <button class="btn btn-warning btn-sm pause-scraping">Pause</button>
+                            <button class="btn btn-danger btn-sm cancel-scraping">Cancel</button>
                         </div>
 
                         <div id="website-selection" class="website-selection d-none mb-3">
